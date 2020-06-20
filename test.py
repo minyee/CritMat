@@ -11,6 +11,7 @@ import robust_topology_engineering.aurora_network as aurora_module
 import robust_topology_engineering.traffic_engineer as te_module
 import robust_topology_engineering.topology_engineer as toe_module
 import robust_topology_engineering.path_selector as path_selector_module
+from robust_topology_engineering.topology_engineering import *
 
 ## import for plotting uses 
 import matplotlib as mpl
@@ -118,7 +119,7 @@ def timeseries_analysis(num_pods, traffic_matrices):
 
 def main(trace_filename, network_ids_filename, aggregation_window):
 
-	num_clusters = 2
+	num_clusters = 8
 
 	traffic_matrices, valid_network_ids = read_in_facebook_traffic(trace_filename, network_ids_filename, aggregation_window)
 	traffic_matrices = traffic_matrices[1:-1]
@@ -219,7 +220,7 @@ def main(trace_filename, network_ids_filename, aggregation_window):
 
 
 	## Topology Engineer classes
-	max_toe = toe_module.HistoricalMaxTrafficTopologyEngineer(aurora_network, 10, 10, all_interblock_paths, traffic_matrices)
+	max_toe = max_topology_engineer.HistoricalMaxTrafficTopologyEngineer(aurora_network, 10, 10, all_interblock_paths, traffic_matrices)
 	max_topology = max_toe.topology_engineer_given_TMs(traffic_matrices, all_interblock_paths)
 	max_topology = aurora_network.round_fractional_topology_giant_switch(max_topology, [])
 	multi_tm_toe = toe_module.RobustMultiTrafficTopologyEngineerImplementationV2(aurora_network, 10,
@@ -228,11 +229,17 @@ def main(trace_filename, network_ids_filename, aggregation_window):
 	multi_tm_topology, routing_weights = multi_tm_toe.topology_engineer_given_representative_TMs(copy.deepcopy(representative_matrices), all_interblock_paths)
 	multi_tm_topology = aurora_network.round_fractional_topology_giant_switch(multi_tm_topology, [])
 
-	bounded_wcmp_toe = toe_module.BoundedTopologyEngineer(aurora_network, 10,
+	multi_tm_toe_v3 = toe_module.RobustMultiTrafficTopologyEngineerImplementationV3(aurora_network, 10,
+																10, all_interblock_paths, 
+																traffic_matrices, num_clusters)
+	multi_tm_topology_v3, multi_tm_topology_v3_routing_weights = multi_tm_toe_v3.topology_engineer_given_representative_TMs(copy.deepcopy(representative_matrices), all_interblock_paths)
+	#multi_tm_topology_v3 = aurora_network.round_fractional_topology_giant_switch(multi_tm_topology_v3, [])
+
+	bounded_wcmp_toe = bounded_wcmp_topology_engineer_weak.BoundedTopologyEngineerWeak(aurora_network, 10,
 																10, all_interblock_paths, 
 																traffic_matrices, num_clusters)
 	bounded_wcmp_topology = bounded_wcmp_toe.topology_engineer_given_representative_TMs(copy.deepcopy(representative_matrices), all_interblock_paths)
-	bounded_wcmp_topology = aurora_network.round_fractional_topology_giant_switch(bounded_wcmp_topology, [])
+	#bounded_wcmp_topology = aurora_network.round_fractional_topology_giant_switch(bounded_wcmp_topology, [])
 
 	fig = plt.figure()
 	plt.imshow(bounded_wcmp_topology)
@@ -260,7 +267,7 @@ def main(trace_filename, network_ids_filename, aggregation_window):
 
 	## NOTE : disable reduce_multihop in topology engineering step to make MLU tail better
 	multi_tm_traffic_engineer = te_module.RobustMultiClusterScaleUpWeightedTrafficEngineer(aurora_network, all_interblock_paths, 4, 1, num_clusters, reduce_multihop=True)
-	multi_tm_traffic_engineer = te_module.RobustMultiClusterTrafficEngineer(aurora_network, all_interblock_paths, 4, 1, num_clusters, reduce_multihop=True)
+	#multi_tm_traffic_engineer = te_module.RobustMultiClusterTrafficEngineer(aurora_network, all_interblock_paths, 4, 1, num_clusters, reduce_multihop=True)
 	unif_multi_tm_routing_weights = multi_tm_traffic_engineer.compute_path_weights(uniform_topology, copy.deepcopy(representative_matrices))
 	#multi_tm_routing_weights = multi_tm_traffic_engineer.compute_path_weights(uniform_topology, [max_tm,])
 	
@@ -293,10 +300,12 @@ def main(trace_filename, network_ids_filename, aggregation_window):
 	unif_bwcmp_ahc = []
 
 	multi_toe_multi_te_mlu = []
+	multi_toe_multi_te_v3_mlu = []
 	ave_toe_ave_te_mlu = []
 	max_toe_max_te_mlu = []
 	multi_toe_bwcmp_mlu = []
 	multi_toe_multi_te_ahc = []
+	multi_toe_multi_te_v3_ahc = []
 	ave_toe_ave_te_ahc = []
 	max_toe_max_te_ahc = []
 	multi_toe_bwcmp_ahc = []
@@ -314,17 +323,19 @@ def main(trace_filename, network_ids_filename, aggregation_window):
 		unif_max_tm_ahc.append(unif_max_tm_perf[3])
 		unif_ave_tm_ahc.append(unif_ave_tm_perf[3])
 		unif_bwcmp_ahc.append(unif_bwcmp_perf[3])
-		print("bwcmp ahc : {}".format(unif_bwcmp_perf[3]))
 
 		multi_toe_multi_te_perf = _evaluate_snapshot_performance(tm, multi_tm_topology, multi_toe_multi_te_routing_weights, link_capacity, total_links, return_lu_distribution=False)
+		multi_toe_multi_te_v3_perf = _evaluate_snapshot_performance(tm, multi_tm_topology_v3, multi_tm_topology_v3_routing_weights, link_capacity, total_links, return_lu_distribution=False)
 		ave_toe_ave_te_perf = _evaluate_snapshot_performance(tm, ave_topology, ave_toe_ave_te_routing_weights, link_capacity, total_links, return_lu_distribution=False)
 		max_toe_max_te_perf = _evaluate_snapshot_performance(tm, max_topology, max_toe_max_te_routing_weights, link_capacity, total_links, return_lu_distribution=False)
 		multi_toe_bwcmp_perf = _evaluate_snapshot_performance(tm, bounded_wcmp_topology, toe_bounded_wcmp_weights, link_capacity, total_links, return_lu_distribution=False)
 		multi_toe_multi_te_mlu.append(multi_toe_multi_te_perf[0])
+		multi_toe_multi_te_v3_mlu.append(multi_toe_multi_te_v3_perf[0])
 		ave_toe_ave_te_mlu.append(ave_toe_ave_te_perf[0])
 		max_toe_max_te_mlu.append(max_toe_max_te_perf[0])
 		multi_toe_bwcmp_mlu.append(multi_toe_bwcmp_perf[0])
 		multi_toe_multi_te_ahc.append(multi_toe_multi_te_perf[3])
+		multi_toe_multi_te_v3_ahc.append(multi_toe_multi_te_v3_perf[3])
 		ave_toe_ave_te_ahc.append(ave_toe_ave_te_perf[3])
 		max_toe_max_te_ahc.append(max_toe_max_te_perf[3])
 		multi_toe_bwcmp_ahc.append(multi_toe_bwcmp_perf[3])
@@ -339,7 +350,8 @@ def main(trace_filename, network_ids_filename, aggregation_window):
 	mlu_axis.plot(range(len(max_toe_max_te_mlu)), (max_toe_max_te_mlu), c=[1,0,0], linestyle="-")
 	mlu_axis.plot(range(len(ave_toe_ave_te_mlu)), (ave_toe_ave_te_mlu), c=[0,1,0], linestyle="-")
 	mlu_axis.plot(range(len(multi_toe_bwcmp_mlu)), (multi_toe_bwcmp_mlu), c=[0,0,1], linestyle="-")
-	mlu_axis.legend(["unif - multi tm", "unif - max", "unif - ave", "unif - bwcmp", "multi toe - multi tm", "max toe - max te", "ave toe - ave te", "multi toe - bwcmp"])
+	mlu_axis.plot(range(len(multi_toe_multi_te_v3_mlu)), (multi_toe_multi_te_v3_mlu), c=[0,1,1], linestyle="-")
+	mlu_axis.legend(["unif - multi tm", "unif - max", "unif - ave", "unif - bwcmp", "multi toe - multi tm", "max toe - max te", "ave toe - ave te", "multi toe - bwcmp", "multi toe v3"])
 	mlu_axis.set_xlim(xmin=0)
 	mlu_axis.set_ylim(ymin=0)
 	mlu_axis.set_title("MLU", fontsize=13)
@@ -353,7 +365,8 @@ def main(trace_filename, network_ids_filename, aggregation_window):
 	ahc_axis.plot(range(len(max_toe_max_te_ahc)), (max_toe_max_te_ahc), c=[1,0,0], linestyle="-")
 	ahc_axis.plot(range(len(ave_toe_ave_te_ahc)), (ave_toe_ave_te_ahc), c=[0,1,0], linestyle="-")
 	ahc_axis.plot(range(len(multi_toe_bwcmp_ahc)), (multi_toe_bwcmp_ahc), c=[0,0,1], linestyle="-")
-	ahc_axis.legend(["unif - multi tm", "unif - max", "unif - ave", "unif - bwcmp", "multi toe - multi tm", "max toe - max te", "ave toe - ave te", "multi toe - bwcmp"])
+	ahc_axis.plot(range(len(multi_toe_multi_te_v3_ahc)), (multi_toe_multi_te_v3_ahc), c=[0,1,1], linestyle="-")
+	ahc_axis.legend(["unif - multi tm", "unif - max", "unif - ave", "unif - bwcmp", "multi toe - multi tm", "max toe - max te", "ave toe - ave te", "multi toe - bwcmp", "multi toe v3"])
 	ahc_axis.set_xlim(xmin=0)
 	ahc_axis.set_ylim(ymin=1, ymax=2)
 	ahc_axis.set_title("Avg. Hop Count", fontsize=13)
@@ -395,7 +408,7 @@ if __name__ == "__main__":
 	valid_network_ids_filename = "/Users/minyee/src/facebook_dcn_traffic/traffic_matrices/clusterB/clusterB_pods.txt"
 	#tm_snapshots_protobuf_filename = "/Users/minyee/src/facebook_dcn_traffic/traffic_matrices/clusterC/hadoop_aggregationwindow_{}.pb".format(aggregation_window)
 	#valid_network_ids_filename = "/Users/minyee/src/facebook_dcn_traffic/traffic_matrices/clusterC/clusterC_pods.txt"
-	tm_snapshots_protobuf_filename = "/Users/minyee/src/facebook_dcn_traffic/traffic_matrices/clustercombined/combined_aggregationwindow_{}.pb".format(aggregation_window)
-	valid_network_ids_filename = "/Users/minyee/src/facebook_dcn_traffic/traffic_matrices/clustercombined/clustercombined_pods.txt"
+	#tm_snapshots_protobuf_filename = "/Users/minyee/src/facebook_dcn_traffic/traffic_matrices/clustercombined/combined_aggregationwindow_{}.pb".format(aggregation_window)
+	#valid_network_ids_filename = "/Users/minyee/src/facebook_dcn_traffic/traffic_matrices/clustercombined/clustercombined_pods.txt"
 	main(tm_snapshots_protobuf_filename, valid_network_ids_filename, aggregation_window)
 

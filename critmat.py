@@ -3,11 +3,16 @@ import numpy as np
 from sklearn.cluster import KMeans
 
 ## The algorithm for computing the representative vectors given a collection
-## of vectors. The 
+## of vectors. Implementation is based off of the paper in: 
+## https://www.cs.utexas.edu/~yzhang/papers/critmat-dsn05.pdf
 class CritMat(object):
-	def __init__(self, training_vectors, distance_function):
+	def __init__(self, training_vectors, distance_function, critical_or_average="critical"):
 		self.number_of_training_snapshots = len(training_vectors)
 		self.training_traffic_vectors =  training_vectors
+		if critical_or_average not in ("critical", "average"):
+			print("Unrecognized CritMat criteria: {}".format(critical_or_average))
+			sys.exit()
+		self.critical_or_average = critical_or_average
 		return
 	# checks if v1 dominates v2
 	def __dominated(self, v1, v2):
@@ -125,13 +130,20 @@ class CritMat(object):
 		# substep 2 : figure out all the vectors, and which cluster they are binned into
 		point_labels = kmeans.predict(training_vectors)
 		# substep 3 : for each cluster centroid, find the points that belong to this cluster, and find the head of each cluster
-		training_vectors = []
+		representative_vectors = []
 		for _ in range(number_of_clusters):
 			head = np.zeros( (vector_dimensions,) )
-			training_vectors.append(head)
-		for training_vector, cluster_label in zip(self.training_traffic_vectors, point_labels):
-			training_vectors[cluster_label] = np.maximum(training_vector, training_vectors[cluster_label])
-		return training_vectors
+			representative_vectors.append(head)
+		if self.critical_or_average == "critical":
+			print("CritMat in critical mode")
+			for training_vector, cluster_label in zip(training_vectors, point_labels):
+				representative_vectors[cluster_label] = np.maximum(training_vector, representative_vectors[cluster_label])
+		else:
+			assert(len(kmeans.cluster_centers_) == number_of_clusters)
+			for cluster_center, k in zip(kmeans.cluster_centers_, range(number_of_clusters)):
+				representative_vectors[k] = np.array(cluster_center)
+		assert(len(representative_vectors) == number_of_clusters)
+		return representative_vectors
 
 	## Derives the critical representative traffic matrices
 	def train(self, number_of_clusters=1, critac_snapshot_limit=100):
