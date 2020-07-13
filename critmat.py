@@ -14,6 +14,13 @@ class CritMat(object):
 			sys.exit()
 		self.critical_or_average = critical_or_average
 		return
+
+	def get_filename_param(self):
+		filename_param = "crit"
+		if self.critical_or_average == "average":
+			filename_param = "avg"
+		return filename_param
+
 	# checks if v1 dominates v2
 	def __dominated(self, v1, v2):
 		dims = len(v1)
@@ -149,13 +156,27 @@ class CritMat(object):
 	def train(self, number_of_clusters=1, critac_snapshot_limit=100):
 		number_of_clusters = int(number_of_clusters)
 		assert(number_of_clusters >= 1)
+		#assert(self.number_of_training_snapshots >= number_of_clusters)
+		number_of_clusters = min(number_of_clusters, self.number_of_training_snapshots)
+		assert(critac_snapshot_limit > 1)
+		vector_dimensions = len(self.training_traffic_vectors[0])
+		training_vectors = []
+		return self.__kmc(self.training_traffic_vectors, number_of_clusters)
+	
+
+## Commented out for now
+'''
+	## Derives the critical representative traffic matrices
+	def train(self, number_of_clusters=1, critac_snapshot_limit=100):
+		number_of_clusters = int(number_of_clusters)
+		assert(number_of_clusters >= 1)
 		assert(self.number_of_training_snapshots >= number_of_clusters)
 		assert(critac_snapshot_limit > 1)
 		vector_dimensions = len(self.training_traffic_vectors[0])
 		training_vectors = []
 
 		return self.__kmc(self.training_traffic_vectors, number_of_clusters)
-
+		
 		if len(self.training_traffic_vectors) <= critac_snapshot_limit:
 			training_vectors = self.training_traffic_vectors
 		else:
@@ -176,3 +197,4 @@ class CritMat(object):
 			for training_vector, cluster_label in zip(self.training_traffic_vectors, point_labels):
 				training_vectors[cluster_label] = np.maximum(training_vector, training_vectors[cluster_label])
 		return self.__CritAC__(training_vectors, number_of_clusters)
+'''
